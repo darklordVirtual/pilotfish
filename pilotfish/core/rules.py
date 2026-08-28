@@ -179,6 +179,27 @@ class EncryptionRule:
 
 
 @dataclass(frozen=True, slots=True)
+class LinkTypeRule:
+    """Excludes a whole link type outright, with a stated reason.
+
+    Used by the floor policy, which refuses FSO categorically rather than
+    reasoning about its weather evidence: the feed that would justify it is the
+    one most likely to be missing at the same moment the authority is.
+    """
+
+    rule_id: str
+    link_type: LinkType
+    reason_text: str
+
+    def evaluate(
+        self, link: Link, tclass: TrafficClass, evidence: EvidenceSnapshot, now: datetime
+    ) -> str | None:
+        if link.type != self.link_type:
+            return None
+        return self.reason_text
+
+
+@dataclass(frozen=True, slots=True)
 class DirectiveRule:
     """A time-bounded human override taking one link out.
 
