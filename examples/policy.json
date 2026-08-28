@@ -1,0 +1,57 @@
+{
+  "bundle_id": "site-north-v3",
+  "validity_s": 86400,
+  "decision_ttl_s": 120,
+  "links": [
+    {
+      "id": "fiber0",
+      "type": "fiber",
+      "encrypted_below": true,
+      "jurisdictions": ["NO"],
+      "owner": "local-isp"
+    },
+    {
+      "id": "lte0",
+      "type": "lte",
+      "metered": true,
+      "jurisdictions": ["NO"],
+      "owner": "mno-a"
+    },
+    {
+      "id": "sat0",
+      "type": "satellite",
+      "metered": true,
+      "jurisdictions": ["NO", "US"],
+      "owner": "leo-operator"
+    },
+    {
+      "id": "fso0",
+      "type": "fso",
+      "encrypted_below": true,
+      "jurisdictions": ["NO"],
+      "owner": "self"
+    }
+  ],
+  "traffic_classes": [
+    { "id": "bulk", "allow_metered": false },
+    { "id": "realtime", "max_rtt_ms": 120.0, "allow_metered": true },
+    {
+      "id": "health",
+      "max_rtt_ms": 250.0,
+      "allow_metered": true,
+      "allowed_jurisdictions": ["NO"],
+      "requires_encryption": true
+    }
+  ],
+  "rules": [
+    ["down", "R-DOWN"],
+    ["max_rtt", "R-RTT-REALTIME", "realtime"],
+    ["max_rtt", "R-RTT-HEALTH", "health"],
+    ["metered", "R-METER-BULK", "bulk"],
+    ["quota", "R-QUOTA-LTE", "lte", 90.0],
+    ["quota", "R-QUOTA-SAT", "satellite", 95.0],
+    ["freshness", "R-FSO-WEATHER", "fso", "visibility_m", 600.0],
+    ["jurisdiction", "R-JUR-HEALTH", "health"],
+    ["encryption", "R-ENC-HEALTH", "health"]
+  ]
+}
