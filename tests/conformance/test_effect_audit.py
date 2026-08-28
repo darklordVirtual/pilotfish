@@ -14,6 +14,7 @@ from pilotfish.adapters.file_sink import MemoryReceiptSink
 from pilotfish.adapters.noop import NoopDataplane
 from pilotfish.agent.bundle_store import BundleStore
 from pilotfish.agent.cycle import AgentCycle, PostconditionViolation
+from pilotfish.agent.epoch import MemoryEpochStore
 from pilotfish.agent.receipts import (
     KIND_DECISION,
     KIND_EFFECT,
@@ -78,6 +79,7 @@ def build(adapter):
         site_id="site-1",
         signed_floor=_signed_floor(AUTHORITY_SK, LINKS, site_id="site-1"),
         now=T0,
+        epoch_store=MemoryEpochStore(),
     )
     store.accept(
         encode_envelope(

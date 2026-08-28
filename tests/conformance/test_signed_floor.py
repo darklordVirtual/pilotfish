@@ -11,6 +11,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from pilotfish.agent.bundle_store import BundleStore
+from pilotfish.agent.epoch import MemoryEpochStore
 from pilotfish.authority.signer import BundleSigner, sign_floor
 from pilotfish.core.bundle import floor_bundle, link_inventory_hash
 from pilotfish.core.models import Link, TrafficClass
@@ -42,6 +43,7 @@ def store(floor: bytes) -> BundleStore:
         site_id=SITE,
         signed_floor=floor,
         now=T0,
+        epoch_store=MemoryEpochStore(),
     )
 
 
@@ -70,6 +72,7 @@ def test_a_floor_bound_to_a_different_link_inventory_is_refused():
             site_id=SITE,
             signed_floor=floor_envelope(links=LINKS),
             now=T0,
+            epoch_store=MemoryEpochStore(),
             floor_links=OTHER_LINKS,
         )
 

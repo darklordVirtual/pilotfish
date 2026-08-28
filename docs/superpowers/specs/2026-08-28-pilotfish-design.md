@@ -262,6 +262,10 @@ claims softened, except where noted above as planned work.
 - A bundle is bound to its authority and to a monotone sequence, and an envelope
   cannot be replayed. Authenticity is not freshness: a correctly signed older
   policy could previously replace a newer, stricter one.
+- That sequence is durable. A second review pass found the high-water mark was
+  still process-local, so a restart reopened the rollback window; it is now
+  written atomically before the bundle takes effect, and an unreadable mark stops
+  the agent rather than reading as zero.
 - The receipt chain recovers its head from the existing log, and refuses a log
   from another site, signed by another key, or with a hole in it.
 - Each cycle writes three receipts: what was authorised, what was attempted, and

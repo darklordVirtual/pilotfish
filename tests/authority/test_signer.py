@@ -4,6 +4,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from pilotfish.agent.bundle_store import BundleStore
+from pilotfish.agent.epoch import MemoryEpochStore
 from pilotfish.authority.signer import BundleSigner, load_bundle_json
 from pilotfish.cli import main
 from pilotfish.core.bundle import PolicyBundle
@@ -37,6 +38,7 @@ def test_published_bundle_verifies_and_round_trips():
         site_id="site-1",
         signed_floor=_signed_floor(SK, LINKS, site_id="site-1"),
         now=T0,
+        epoch_store=MemoryEpochStore(),
     )
     assert store.accept(blob, now=T0).hash() == BUNDLE.hash()
 

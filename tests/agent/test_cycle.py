@@ -7,6 +7,7 @@ from pilotfish.adapters.file_sink import MemoryReceiptSink
 from pilotfish.adapters.noop import NoopDataplane
 from pilotfish.agent.bundle_store import BundleStore
 from pilotfish.agent.cycle import AgentCycle, PostconditionViolation
+from pilotfish.agent.epoch import MemoryEpochStore
 from pilotfish.agent.receipts import ReceiptChain
 from pilotfish.core.bundle import PolicyBundle
 from pilotfish.core.models import Link, Observation, TrafficClass
@@ -87,6 +88,7 @@ def build(adapter=None, install=BUNDLE):
         site_id="site-1",
         signed_floor=_signed_floor(AUTHORITY_SK, LINKS, site_id="site-1"),
         now=T0,
+        epoch_store=MemoryEpochStore(),
     )
     if install is not None:
         store.accept(envelope_for(install), now=T0)
@@ -136,6 +138,7 @@ def test_bundle_swap_mid_cycle_does_not_mix_two_bundles():
         site_id="site-1",
         signed_floor=_signed_floor(AUTHORITY_SK, LINKS, site_id="site-1"),
         now=T0,
+        epoch_store=MemoryEpochStore(),
     )
     store.accept(envelope_for(BUNDLE), now=T0)
 

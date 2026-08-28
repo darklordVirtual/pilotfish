@@ -7,6 +7,10 @@ signature answers only the first:
 2. Is it current, rather than a correctly signed policy from some earlier epoch?
 3. Is it inside its validity window?
 
+The answer to the second must survive a restart, so the highest sequence ever
+accepted is durable rather than held in memory: see
+:mod:`pilotfish.agent.epoch`.
+
 Checking only the first is the classic mistake. An attacker who can replay an
 old but validly signed bundle widens the permitted set without forging anything,
 and every signature in the audit trail still verifies afterwards.
@@ -22,6 +26,7 @@ from datetime import datetime
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from pilotfish.agent.epoch import EpochStore, EpochUnreadable
 from pilotfish.core.bundle import PolicyBundle, link_inventory_hash
 from pilotfish.core.models import MAX_CLOCK_SKEW_S, Link
 from pilotfish.protocol.envelope import SignatureInvalid, decode_envelope, verify
@@ -43,6 +48,7 @@ class BundleStore:
         site_id: str,
         signed_floor: bytes,
         now: datetime,
+        epoch_store: EpochStore,
         floor_links: tuple[Link, ...] | None = None,
     ) -> None:
         self._trusted_key = trusted_key
@@ -50,7 +56,13 @@ class BundleStore:
         self._site_id = site_id
         self._floor = self._install_floor(signed_floor, now, floor_links)
         self._bundle: PolicyBundle | None = None
-        self._sequence = -1
+        self._epochs = epoch_store
+        try:
+            self._sequence = epoch_store.read()
+        except EpochUnreadable as exc:
+            # Reading a corrupt mark as "nothing accepted yet" would reopen the
+            # whole rollback window, so refuse to start instead.
+            raise BundleUnverified(f"cannot establish the policy high-water mark: {exc}") from exc
         self._seen_nonces: set[bytes] = set()
 
     def _install_floor(
@@ -139,6 +151,12 @@ class BundleStore:
             raise BundleExpired(
                 f"bundle {bundle.bundle_id} expired at {bundle.not_after.isoformat()}"
             )
+
+        # The mark is committed before the bundle governs anything. If this
+        # write fails the site keeps running under whatever it had, which is the
+        # conservative direction: it will not later accept something older on the
+        # strength of a sequence it never managed to record.
+        self._epochs.commit(bundle.sequence)
 
         self._seen_nonces.add(envelope.nonce)
         self._bundle = bundle

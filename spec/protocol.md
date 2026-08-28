@@ -77,6 +77,17 @@ Authenticity is not freshness. Without it, an old but validly signed bundle can
 replace a newer and stricter one, widening the permitted set without anything
 being forged, and every signature in the resulting audit trail still verifies.
 
+The highest accepted sequence must be durable. A high-water mark held in process
+memory protects a site only until it restarts, and an attacker who can cause a
+restart, or wait for one, recovers the whole rollback window. Implementations
+must record it atomically before the bundle carrying it takes effect, and must
+refuse to start rather than treat an unreadable mark as zero.
+
+Given a durable, strictly increasing sequence, envelope nonce tracking is a
+redundant second line: a replayed bundle cannot carry a number higher than the
+one already recorded. Implementations may keep a per-run nonce set against two
+envelopes sharing a sequence within one run, and are not required to persist it.
+
 A site that has no valid bundle does not fall back to the last one it liked. It
 falls to its floor policy and marks every decision taken that way as degraded.
 

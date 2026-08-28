@@ -11,6 +11,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from pilotfish.agent.bundle_store import BundleStore
+from pilotfish.agent.epoch import MemoryEpochStore
 from pilotfish.core.bundle import PolicyBundle
 from pilotfish.core.models import Link, TrafficClass
 from pilotfish.core.rules import LinkDownRule, MeteredRule
@@ -58,6 +59,7 @@ def store() -> BundleStore:
         site_id="site-1",
         signed_floor=_signed_floor(SK, LINKS, site_id="site-1", issuer=AUTHORITY),
         now=T0,
+        epoch_store=MemoryEpochStore(),
     )
 
 

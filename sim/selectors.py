@@ -19,6 +19,7 @@ from pilotfish.adapters.file_sink import MemoryReceiptSink
 from pilotfish.adapters.noop import NoopDataplane
 from pilotfish.agent.bundle_store import BundleStore
 from pilotfish.agent.cycle import AgentCycle
+from pilotfish.agent.epoch import MemoryEpochStore
 from pilotfish.agent.receipts import ReceiptChain
 from pilotfish.authority.signer import BundleSigner, sign_floor
 from pilotfish.core.bundle import PolicyBundle
@@ -169,6 +170,7 @@ class Governed:
                 now=self._bundle.issued_at,
             ),
             now=self._bundle.issued_at,
+            epoch_store=MemoryEpochStore(),
         )
         self._sink = MemoryReceiptSink()
         self._chain = ReceiptChain(self._site_id, self._sink, SITE_KEY)
