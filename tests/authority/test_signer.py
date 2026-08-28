@@ -11,6 +11,7 @@ from pilotfish.core.bundle import PolicyBundle
 from pilotfish.core.decide import decide
 from pilotfish.core.models import EvidenceSnapshot, Link, Observation, TrafficClass
 from pilotfish.core.rules import LinkDownRule
+from pilotfish.protocol.envelope import decode_envelope
 
 T0 = datetime(2026, 8, 28, 12, 0, tzinfo=UTC)
 SK = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
@@ -41,6 +42,24 @@ def test_published_bundle_verifies_and_round_trips():
         epoch_store=MemoryEpochStore(),
     )
     assert store.accept(blob, now=T0).hash() == BUNDLE.hash()
+
+
+def test_default_publish_nonce_is_fresh_for_each_envelope():
+    signer = BundleSigner(SK, "authority-1")
+    first = decode_envelope(signer.publish(BUNDLE, now=T0))
+    second = decode_envelope(signer.publish(BUNDLE, now=T0))
+
+    assert len(first.nonce) == 16
+    assert len(second.nonce) == 16
+    assert first.nonce != second.nonce
+    assert first.nonce != b"\x00" * 16
+    assert second.nonce != b"\x00" * 16
+
+
+def test_explicit_nonce_remains_available_for_deterministic_vectors():
+    nonce = bytes(range(16))
+    envelope = decode_envelope(BundleSigner(SK, "authority-1").publish(BUNDLE, now=T0, nonce=nonce))
+    assert envelope.nonce == nonce
 
 
 def test_policy_file_parses_into_the_expected_shape():
