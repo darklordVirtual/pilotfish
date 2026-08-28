@@ -15,7 +15,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
-from pilotfish.core.models import EvidenceSnapshot, Link, LinkType, TrafficClass
+from pilotfish.core.models import (
+    EvidenceSnapshot,
+    Link,
+    LinkType,
+    TrafficClass,
+    _require_finite,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +108,9 @@ class QuotaRule:
     link_type: LinkType
     threshold_pct: float
 
+    def __post_init__(self) -> None:
+        _require_finite(self.threshold_pct, "QuotaRule.threshold_pct")
+
     def evaluate(
         self, link: Link, tclass: TrafficClass, evidence: EvidenceSnapshot, now: datetime
     ) -> str | None:
@@ -127,6 +136,9 @@ class EvidenceFreshnessRule:
     link_type: LinkType
     quantity: str
     max_age_s: float
+
+    def __post_init__(self) -> None:
+        _require_finite(self.max_age_s, "EvidenceFreshnessRule.max_age_s")
 
     def evaluate(
         self, link: Link, tclass: TrafficClass, evidence: EvidenceSnapshot, now: datetime

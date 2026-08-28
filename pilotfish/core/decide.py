@@ -54,6 +54,10 @@ def decide(
 ) -> EligibilityDecision:
     """Every link starts as a candidate; rules take links out, never put them in."""
 
+    # Discard evidence dated past the skew allowance before anything reads it, and
+    # bind the receipt to the snapshot actually used rather than the one supplied.
+    evidence = evidence.as_of(now)
+
     classes: list[ClassEligibility] = []
     for tclass in sorted(bundle.traffic_classes, key=lambda c: c.id):
         permitted: list[str] = []

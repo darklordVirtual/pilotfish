@@ -5,6 +5,10 @@ some rule has learned to admit a link, and the decision stops being explainable.
 
 Determinism: the same inputs give a bit-identical decision. Without this the
 receipts chain proves nothing, because a verifier could not recompute.
+
+The value strategy excludes NaN and infinity because the model layer now refuses
+to construct them at all; the negative conformance tests cover that boundary
+directly. Timestamps deliberately range into the future.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -59,7 +63,9 @@ def evidence_snapshots(draw):
                 link_id=st.sampled_from(LINK_IDS),
                 quantity=st.sampled_from(["up", "rtt_ms", "quota_used_pct", "visibility_m"]),
                 value=st.floats(min_value=0.0, max_value=1000.0, allow_nan=False),
-                at=st.integers(min_value=-3600, max_value=0).map(
+                # Deliberately reaches into the future as well: evidence dated
+                # ahead of the clock must never widen a permitted set.
+                at=st.integers(min_value=-3600, max_value=3600).map(
                     lambda offset: T0 + timedelta(seconds=offset)
                 ),
                 source=st.sampled_from(["agent", "operator", "model"]),

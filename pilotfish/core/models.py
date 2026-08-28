@@ -8,7 +8,8 @@ observation at all, because policy would silently treat it as fresh.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+import math
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Literal
 
@@ -21,9 +22,30 @@ LinkType = Literal["fiber", "lte", "satellite", "fso"]
 ObservationSourceName = Literal["agent", "operator", "model"]
 
 
+#: How far ahead of our own clock another party's timestamp may be before we stop
+#: believing it. Honest clocks disagree by seconds; evidence dated further into
+#: the future than this is not evidence, and treating it as fresh would switch
+#: abstention off exactly when it is most needed.
+MAX_CLOCK_SKEW_S = 120.0
+
+
 def _require_utc(value: datetime, field_name: str) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{field_name} must be timezone-aware UTC, got naive {value!r}")
+
+
+def _require_finite(value: float | None, field_name: str) -> None:
+    """NaN compares false against every threshold, so it defeats every rule at once.
+
+    A rule asking "is this over the limit" answers no for NaN, and a rule asking
+    "is this under the limit" also answers no. Either way the link stays in the
+    permitted set on the strength of a measurement that means nothing.
+    """
+
+    if value is None:
+        return
+    if not math.isfinite(value):
+        raise ValueError(f"{field_name} must be finite, got {value!r}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,10 +77,18 @@ class Observation:
 
     def __post_init__(self) -> None:
         _require_utc(self.at, "Observation.at")
+        _require_finite(self.value, "Observation.value")
 
     def age_s(self, now: datetime) -> float:
+        """Age in seconds, floored at zero.
+
+        A reading from slightly ahead of our clock is at most brand new; it is
+        never negative, because a negative age would read as more recent than
+        anything real and would outrank genuine measurements.
+        """
+
         _require_utc(now, "now")
-        return (now - self.at).total_seconds()
+        return max(0.0, (now - self.at).total_seconds())
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,12 +105,28 @@ class TrafficClass:
     allowed_jurisdictions: tuple[str, ...] | None = None
     requires_encryption: bool = False
 
+    def __post_init__(self) -> None:
+        _require_finite(self.max_rtt_ms, "TrafficClass.max_rtt_ms")
+
 
 @dataclass(frozen=True, slots=True)
 class EvidenceSnapshot:
     """A set of observations with a hash that is independent of their ordering."""
 
     observations: tuple[Observation, ...] = field(default_factory=tuple)
+
+    def as_of(self, now: datetime) -> EvidenceSnapshot:
+        """Drop evidence dated further ahead than the skew allowance.
+
+        Dropping rather than clamping is deliberate. A discarded observation
+        leaves the quantity missing, and missing evidence already excludes, so a
+        clock running fast makes the permitted set smaller instead of larger.
+        """
+
+        _require_utc(now, "now")
+        horizon = now.timestamp() + MAX_CLOCK_SKEW_S
+        kept = tuple(o for o in self.observations if o.at.timestamp() <= horizon)
+        return replace(self, observations=kept)
 
     def latest(self, link_id: str, quantity: str) -> Observation | None:
         candidates = [
