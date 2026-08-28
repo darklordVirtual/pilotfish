@@ -46,7 +46,10 @@ BUNDLE = PolicyBundle(
     not_after=T0 + timedelta(hours=24),
     decision_ttl_s=120,
     links=LINKS,
-    traffic_classes=(CLASS_BULK, TrafficClass("health", allowed_jurisdictions=("NO",), requires_encryption=True)),
+    traffic_classes=(
+        CLASS_BULK,
+        TrafficClass("health", allowed_jurisdictions=("NO",), requires_encryption=True),
+    ),
     rules=(
         LinkDownRule("R-DOWN"),
         MaxRttRule("R-RTT", "bulk"),
@@ -67,7 +70,9 @@ SNAP = EvidenceSnapshot(
 )
 DECISION = decide(bundle=BUNDLE, evidence=SNAP, now=T0, site_id="site-1")
 BATCH = ObservationBatch(site_id="site-1", observations=SNAP.observations)
-DIRECTIVE = AuthorityDirective("D-1", "site-1", "lte0", "carrier maintenance", T0 + timedelta(hours=2))
+DIRECTIVE = AuthorityDirective(
+    "D-1", "site-1", "lte0", "carrier maintenance", T0 + timedelta(hours=2)
+)
 
 
 @pytest.mark.parametrize(
@@ -100,4 +105,7 @@ def test_directive_converts_to_a_rule_that_excludes_only_its_link():
 
 def test_expired_directive_stops_excluding():
     rule = DIRECTIVE.to_rule()
-    assert rule.evaluate(Link(id="lte0", type="lte"), CLASS_BULK, EMPTY, T0 + timedelta(hours=3)) is None
+    assert (
+        rule.evaluate(Link(id="lte0", type="lte"), CLASS_BULK, EMPTY, T0 + timedelta(hours=3))
+        is None
+    )

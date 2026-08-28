@@ -43,12 +43,21 @@ from pilotfish.core.models import EvidenceSnapshot, Link, Observation
 
 T0 = datetime(2026, 8, 28, 12, 0, tzinfo=UTC)
 
+
 def obs(link_id="lte0", quantity="rtt_ms", value=40.0, at=T0, source="agent"):
     return Observation(link_id=link_id, quantity=quantity, value=value, at=at, source=source)
 
+
 def test_naive_timestamp_rejected():
     with pytest.raises(ValueError):
-        Observation(link_id="a", quantity="rtt_ms", value=1.0, at=datetime(2026, 8, 28, 12, 0), source="agent")
+        Observation(
+            link_id="a",
+            quantity="rtt_ms",
+            value=1.0,
+            at=datetime(2026, 8, 28, 12, 0),
+            source="agent",
+        )
+
 
 def test_latest_wins_and_age_is_computed():
     snap = EvidenceSnapshot((obs(value=40.0), obs(value=10.0, at=T0 + timedelta(seconds=30))))
@@ -56,10 +65,12 @@ def test_latest_wins_and_age_is_computed():
     assert snap.age_s("lte0", "rtt_ms", T0 + timedelta(seconds=90)) == 60.0
     assert snap.latest("lte0", "loss_pct") is None
 
+
 def test_hash_is_order_independent_and_content_sensitive():
     a, b = obs(value=1.0), obs(link_id="fiber0", value=2.0)
     assert EvidenceSnapshot((a, b)).hash() == EvidenceSnapshot((b, a)).hash()
     assert EvidenceSnapshot((a,)).hash() != EvidenceSnapshot((b,)).hash()
+
 
 def test_link_defaults():
     link = Link(id="sat0", type="satellite")
@@ -109,25 +120,42 @@ git commit -m "feat(core): domain models with UTC-checked timestamps and evidenc
 
 ```python
 def test_freshness_rule_excludes_when_evidence_is_stale():
-    rule = EvidenceFreshnessRule("R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600)
+    rule = EvidenceFreshnessRule(
+        "R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600
+    )
     link = Link(id="fso0", type="fso")
     snap = EvidenceSnapshot((Observation("fso0", "visibility_m", 3000.0, T0, "model"),))
     assert rule.evaluate(link, CLASS_BULK, snap, T0 + timedelta(seconds=300)) is None
     assert "stale" in rule.evaluate(link, CLASS_BULK, snap, T0 + timedelta(seconds=900))
 
+
 def test_freshness_rule_excludes_when_evidence_is_missing_entirely():
-    rule = EvidenceFreshnessRule("R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600)
-    assert rule.evaluate(Link(id="fso0", type="fso"), CLASS_BULK, EvidenceSnapshot(()), T0) is not None
+    rule = EvidenceFreshnessRule(
+        "R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600
+    )
+    assert (
+        rule.evaluate(Link(id="fso0", type="fso"), CLASS_BULK, EvidenceSnapshot(()), T0) is not None
+    )
+
 
 def test_freshness_rule_ignores_other_link_types():
-    rule = EvidenceFreshnessRule("R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600)
+    rule = EvidenceFreshnessRule(
+        "R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600
+    )
     assert rule.evaluate(Link(id="f0", type="fiber"), CLASS_BULK, EvidenceSnapshot(()), T0) is None
+
 
 def test_metered_rule_only_binds_its_own_class():
     rule = MeteredRule("R-METER", class_id="realtime")
     lte = Link(id="lte0", type="lte", metered=True)
-    assert rule.evaluate(lte, TrafficClass("realtime", allow_metered=False), EvidenceSnapshot(()), T0) is not None
-    assert rule.evaluate(lte, TrafficClass("bulk", allow_metered=False), EvidenceSnapshot(()), T0) is None
+    assert (
+        rule.evaluate(lte, TrafficClass("realtime", allow_metered=False), EvidenceSnapshot(()), T0)
+        is not None
+    )
+    assert (
+        rule.evaluate(lte, TrafficClass("bulk", allow_metered=False), EvidenceSnapshot(()), T0)
+        is None
+    )
 ```
 
 Missing evidence excluding rather than admitting is the single most important behaviour in this file: absence of evidence is never evidence of health.
@@ -174,14 +202,21 @@ def test_every_link_is_a_candidate_and_exclusions_carry_rule_ids():
     assert "fso0" not in fso.permitted
     assert any(e.link_id == "fso0" and e.rule_id == "R-FSO-FRESH" for e in fso.exclusions)
 
+
 def test_decision_binds_bundle_and_evidence_hashes():
     decision = decide(bundle=BUNDLE, evidence=SNAP, now=T0, site_id="site-1")
     assert decision.bundle_hash == BUNDLE.hash()
     assert decision.evidence_hash == SNAP.hash()
     assert decision.valid_until == T0 + timedelta(seconds=BUNDLE.decision_ttl_s)
 
+
 def test_degraded_flag_is_carried_not_inferred():
-    assert decide(bundle=floor_bundle(LINKS), evidence=SNAP, now=T0, site_id="s", degraded=True).degraded is True
+    assert (
+        decide(
+            bundle=floor_bundle(LINKS), evidence=SNAP, now=T0, site_id="s", degraded=True
+        ).degraded
+        is True
+    )
 ```
 
 ```python
@@ -189,9 +224,12 @@ def test_degraded_flag_is_carried_not_inferred():
 @given(evidence=evidence_snapshots(), extra=rule_lists())
 def test_more_rules_never_grow_the_permitted_set(evidence, extra):
     base = decide(bundle=BUNDLE, evidence=evidence, now=T0, site_id="s")
-    wider = decide(bundle=BUNDLE.with_rules(BUNDLE.rules + extra), evidence=evidence, now=T0, site_id="s")
+    wider = decide(
+        bundle=BUNDLE.with_rules(BUNDLE.rules + extra), evidence=evidence, now=T0, site_id="s"
+    )
     for cls in base.classes:
         assert set(wider.permitted_for(cls.class_id)) <= set(cls.permitted)
+
 
 @given(evidence=evidence_snapshots())
 def test_decision_is_deterministic(evidence):
@@ -238,13 +276,29 @@ git commit -m "feat(core): pure eligibility decision, monotone and deterministic
 
 ```python
 def test_roundtrip_and_verify():
-    env = sign(msg_type="POLICY_BUNDLE", issuer="authority-1", issued_at=T0, nonce=b"\x01" * 16, payload=b"hello", private_key=SK)
+    env = sign(
+        msg_type="POLICY_BUNDLE",
+        issuer="authority-1",
+        issued_at=T0,
+        nonce=b"\x01" * 16,
+        payload=b"hello",
+        private_key=SK,
+    )
     verify(env, SK.public_key())
 
+
 def test_tampered_payload_fails_verification():
-    env = sign(msg_type="POLICY_BUNDLE", issuer="authority-1", issued_at=T0, nonce=b"\x01" * 16, payload=b"hello", private_key=SK)
+    env = sign(
+        msg_type="POLICY_BUNDLE",
+        issuer="authority-1",
+        issued_at=T0,
+        nonce=b"\x01" * 16,
+        payload=b"hello",
+        private_key=SK,
+    )
     with pytest.raises(SignatureInvalid):
         verify(replace(env, payload=b"hellp"), SK.public_key())
+
 
 def test_signing_input_is_stable_across_map_ordering():
     assert dumps({"b": 1, "a": 2}) == dumps({"a": 2, "b": 1})
@@ -290,15 +344,24 @@ git commit -m "feat(protocol): canonical CBOR and Ed25519 signed envelope with f
 def test_message_roundtrip_is_lossless(obj, enc, dec):
     assert dec(enc(obj)) == obj
 
+
 def test_directive_converts_to_a_rule_that_excludes_only_its_link():
     d = AuthorityDirective("D-1", "site-1", "lte0", "carrier maintenance", T0 + timedelta(hours=2))
     rule = d.to_rule()
-    assert rule.evaluate(Link(id="lte0", type="lte"), CLASS_BULK, EvidenceSnapshot(()), T0) is not None
+    assert (
+        rule.evaluate(Link(id="lte0", type="lte"), CLASS_BULK, EvidenceSnapshot(()), T0) is not None
+    )
     assert rule.evaluate(Link(id="f0", type="fiber"), CLASS_BULK, EvidenceSnapshot(()), T0) is None
+
 
 def test_expired_directive_stops_excluding():
     d = AuthorityDirective("D-1", "site-1", "lte0", "maintenance", T0 + timedelta(hours=2))
-    assert d.to_rule().evaluate(Link(id="lte0", type="lte"), CLASS_BULK, EvidenceSnapshot(()), T0 + timedelta(hours=3)) is None
+    assert (
+        d.to_rule().evaluate(
+            Link(id="lte0", type="lte"), CLASS_BULK, EvidenceSnapshot(()), T0 + timedelta(hours=3)
+        )
+        is None
+    )
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -342,12 +405,14 @@ def test_unsigned_or_wrongly_signed_bundle_is_refused():
     with pytest.raises(BundleUnverified):
         store.accept(sign_with(OTHER_SK, BUNDLE), now=T0)
 
+
 def test_expired_bundle_falls_to_degraded_floor_not_to_the_old_bundle():
     store = BundleStore(trusted_key=PK, floor_links=LINKS)
     store.accept(sign_with(SK, BUNDLE), now=T0)
     bundle, degraded = store.current(now=BUNDLE.not_after + timedelta(seconds=1))
     assert degraded is True
     assert bundle.bundle_id == "floor"
+
 
 def test_no_bundle_at_all_is_degraded_from_the_start():
     _, degraded = BundleStore(trusted_key=PK, floor_links=LINKS).current(now=T0)
@@ -392,7 +457,9 @@ git commit -m "feat(agent): fail-closed bundle store with degraded floor policy"
 ```python
 def test_public_api_snapshot_is_unchanged():
     import pilotfish.sdk as sdk
+
     assert {n for n in dir(sdk) if not n.startswith("_")} == sdk.PUBLIC_API
+
 
 def test_enforcement_failed_is_the_only_operational_fault():
     assert issubclass(EnforcementFailed, PilotfishError)
@@ -444,14 +511,17 @@ def test_chain_links_and_numbers_are_contiguous():
     assert r2.prev_hash == r1.hash()
     verify_chain([r1, r2])
 
+
 def test_a_removed_receipt_breaks_the_chain():
     r1, r2, r3 = build_three()
     with pytest.raises(ChainBroken):
         verify_chain([r1, r3])
 
+
 def test_sink_is_append_only():
     sink = FileReceiptSink(tmp_path / "receipts.log")
-    sink.append(b"a"); sink.append(b"b")
+    sink.append(b"a")
+    sink.append(b"b")
     assert (tmp_path / "receipts.log").read_bytes().count(b"\n") == 2
 ```
 
@@ -492,14 +562,17 @@ git commit -m "feat(agent): hash-chained append-only decision receipts"
 
 ```python
 def test_readback_mismatch_raises_after_the_receipt_is_written():
-    adapter = LyingDataplane()          # applies, then reports a link that was excluded
+    adapter = LyingDataplane()  # applies, then reports a link that was excluded
     cycle = AgentCycle("site-1", store, source, adapter, chain)
     with pytest.raises(PostconditionViolation):
         cycle.run_once(now=T0)
-    assert len(sink.lines) == 1          # the decision is on the record regardless
+    assert len(sink.lines) == 1  # the decision is on the record regardless
+
 
 def test_bundle_swap_mid_cycle_does_not_mix_two_bundles():
-    source = SwappingSource(store, new_bundle_envelope=OTHER_BUNDLE_BYTES)  # accepts a new bundle during observe()
+    source = SwappingSource(
+        store, new_bundle_envelope=OTHER_BUNDLE_BYTES
+    )  # accepts a new bundle during observe()
     decision = AgentCycle("site-1", store, source, NoopDataplane(), chain).run_once(now=T0)
     assert decision.bundle_hash in (BUNDLE.hash(), OTHER_BUNDLE.hash())
     assert decision.bundle_hash == store.decided_against_hash
@@ -548,6 +621,7 @@ def test_published_bundle_verifies_and_round_trips():
     store = BundleStore(trusted_key=SK.public_key(), floor_links=LINKS)
     assert store.accept(blob, now=T0).hash() == BUNDLE.hash()
 
+
 def test_policy_file_parses_into_the_same_bundle_shape():
     bundle = load_bundle_json(FIXTURE_POLICY)
     assert {r.rule_id for r in bundle.rules} == {"R-DOWN", "R-FSO-FRESH", "R-QUOTA", "R-METER"}
@@ -595,10 +669,12 @@ def test_fso_degrades_with_visibility_and_stops_reporting_when_the_sensor_dies()
     model.sensor_failed = True
     assert model.step(T0, rng) == ()
 
+
 def test_lte_quota_is_consumed_only_when_the_link_carries_traffic():
     model = LteModel(quota_gb=10.0)
     model.carry(bytes_=10**9)
     assert model.quota_used_pct() == pytest.approx(10.0)
+
 
 def test_events_are_applied_at_their_timestamp_not_before():
     result = run(SCENARIO_WITH_CUT_AT_60S, selector=greedy, seed=1)
@@ -647,9 +723,11 @@ def test_governed_never_violates_a_class_requirement_it_was_given():
     table = compare([QUOTA_SCENARIO, REGULATED_SCENARIO], SELECTORS, seeds=range(5))
     assert table.violations("governed") == 0
 
+
 def test_greedy_beats_governed_on_uptime_somewhere_and_that_is_recorded():
     table = compare([PLAIN_FAILOVER_SCENARIO], SELECTORS, seeds=range(5))
     assert table.downtime("greedy") <= table.downtime("governed")
+
 
 def test_hysteresis_baseline_actually_damps_flapping():
     table = compare([FLAPPY_SCENARIO], SELECTORS, seeds=range(5))

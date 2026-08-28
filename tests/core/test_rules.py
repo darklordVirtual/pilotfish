@@ -17,7 +17,9 @@ EMPTY = EvidenceSnapshot(())
 
 
 def test_freshness_rule_excludes_when_evidence_is_stale():
-    rule = EvidenceFreshnessRule("R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600)
+    rule = EvidenceFreshnessRule(
+        "R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600
+    )
     link = Link(id="fso0", type="fso")
     snap = EvidenceSnapshot((Observation("fso0", "visibility_m", 3000.0, T0, "model"),))
     assert rule.evaluate(link, CLASS_BULK, snap, T0 + timedelta(seconds=300)) is None
@@ -25,12 +27,16 @@ def test_freshness_rule_excludes_when_evidence_is_stale():
 
 
 def test_freshness_rule_excludes_when_evidence_is_missing_entirely():
-    rule = EvidenceFreshnessRule("R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600)
+    rule = EvidenceFreshnessRule(
+        "R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600
+    )
     assert rule.evaluate(Link(id="fso0", type="fso"), CLASS_BULK, EMPTY, T0) is not None
 
 
 def test_freshness_rule_ignores_other_link_types():
-    rule = EvidenceFreshnessRule("R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600)
+    rule = EvidenceFreshnessRule(
+        "R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600
+    )
     assert rule.evaluate(Link(id="f0", type="fiber"), CLASS_BULK, EMPTY, T0) is None
 
 
@@ -82,9 +88,15 @@ def test_jurisdiction_and_encryption_rules():
     juris = JurisdictionRule("R-JUR", class_id="health")
     health = TrafficClass("health", allowed_jurisdictions=("NO",))
     assert juris.evaluate(Link(id="s0", type="satellite", jurisdictions=("US",)), health, EMPTY, T0)
-    assert juris.evaluate(Link(id="f0", type="fiber", jurisdictions=("NO",)), health, EMPTY, T0) is None
+    assert (
+        juris.evaluate(Link(id="f0", type="fiber", jurisdictions=("NO",)), health, EMPTY, T0)
+        is None
+    )
 
     enc = EncryptionRule("R-ENC", class_id="health")
     health_enc = TrafficClass("health", requires_encryption=True)
     assert enc.evaluate(Link(id="f0", type="fiber", encrypted_below=False), health_enc, EMPTY, T0)
-    assert enc.evaluate(Link(id="f0", type="fiber", encrypted_below=True), health_enc, EMPTY, T0) is None
+    assert (
+        enc.evaluate(Link(id="f0", type="fiber", encrypted_below=True), health_enc, EMPTY, T0)
+        is None
+    )

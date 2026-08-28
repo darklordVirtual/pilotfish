@@ -22,7 +22,9 @@ BUNDLE = PolicyBundle(
     traffic_classes=(TrafficClass("bulk"),),
     rules=(
         LinkDownRule("R-DOWN"),
-        EvidenceFreshnessRule("R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600),
+        EvidenceFreshnessRule(
+            "R-FSO-FRESH", link_type="fso", quantity="visibility_m", max_age_s=600
+        ),
     ),
 )
 
@@ -61,9 +63,7 @@ def test_decision_binds_bundle_and_evidence_hashes():
 
 
 def test_degraded_flag_is_carried_not_inferred():
-    decision = decide(
-        bundle=floor_bundle(LINKS), evidence=SNAP, now=T0, site_id="s", degraded=True
-    )
+    decision = decide(bundle=floor_bundle(LINKS), evidence=SNAP, now=T0, site_id="s", degraded=True)
     assert decision.degraded is True
 
 

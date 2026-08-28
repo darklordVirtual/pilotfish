@@ -96,7 +96,6 @@ class EvidenceSnapshot:
 
     def hash(self) -> str:
         rows = sorted(
-            (o.link_id, o.quantity, o.at.timestamp(), o.source, o.value)
-            for o in self.observations
+            (o.link_id, o.quantity, o.at.timestamp(), o.source, o.value) for o in self.observations
         )
         return hashlib.sha256(cbor2.dumps(rows, canonical=True)).hexdigest()

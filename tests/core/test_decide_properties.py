@@ -72,8 +72,12 @@ def evidence_snapshots(draw):
 
 extra_rules = st.lists(
     st.one_of(
-        st.builds(MaxRttRule, rule_id=st.just("X-RTT"), class_id=st.sampled_from(["bulk", "realtime"])),
-        st.builds(MeteredRule, rule_id=st.just("X-METER"), class_id=st.sampled_from(["bulk", "health"])),
+        st.builds(
+            MaxRttRule, rule_id=st.just("X-RTT"), class_id=st.sampled_from(["bulk", "realtime"])
+        ),
+        st.builds(
+            MeteredRule, rule_id=st.just("X-METER"), class_id=st.sampled_from(["bulk", "health"])
+        ),
         st.builds(
             QuotaRule,
             rule_id=st.just("X-QUOTA"),

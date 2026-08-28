@@ -14,7 +14,13 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 
-from pilotfish.protocol.envelope import decode_envelope, encode_envelope, sign, signing_input, verify
+from pilotfish.protocol.envelope import (
+    decode_envelope,
+    encode_envelope,
+    sign,
+    signing_input,
+    verify,
+)
 
 VECTOR = json.loads((Path(__file__).parents[2] / "spec/vectors/envelope.json").read_text())
 
@@ -41,7 +47,9 @@ def test_signature_matches_the_frozen_vector():
 
 def test_encoded_envelope_matches_the_frozen_vector():
     sk = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(VECTOR["private_key_hex"]))
-    assert encode_envelope(sign(**_inputs(), private_key=sk)).hex() == VECTOR["encoded_envelope_hex"]
+    assert (
+        encode_envelope(sign(**_inputs(), private_key=sk)).hex() == VECTOR["encoded_envelope_hex"]
+    )
 
 
 def test_a_third_party_holding_only_the_public_key_can_verify_the_vector():

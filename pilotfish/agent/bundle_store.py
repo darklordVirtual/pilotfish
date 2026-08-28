@@ -38,7 +38,9 @@ class BundleStore:
 
         bundle = decode_bundle(envelope.payload)
         if now >= bundle.not_after:
-            raise BundleExpired(f"bundle {bundle.bundle_id} expired at {bundle.not_after.isoformat()}")
+            raise BundleExpired(
+                f"bundle {bundle.bundle_id} expired at {bundle.not_after.isoformat()}"
+            )
         self._bundle = bundle
         return bundle
 
