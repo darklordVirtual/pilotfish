@@ -12,10 +12,16 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from pilotfish.core.bundle import PolicyBundle
+from pilotfish.core.bundle import PolicyBundle, floor_bundle, link_inventory_hash
 from pilotfish.core.models import Link, TrafficClass
 from pilotfish.protocol.envelope import encode_envelope, sign
-from pilotfish.protocol.messages import MSG_POLICY_BUNDLE, decode_rule, encode_bundle
+from pilotfish.protocol.messages import (
+    MSG_FLOOR_CONFIG,
+    MSG_POLICY_BUNDLE,
+    decode_rule,
+    encode_bundle,
+    encode_floor_config,
+)
 
 DEFAULT_NONCE = b"\x00" * 16
 
@@ -24,6 +30,14 @@ class BundleSigner:
     def __init__(self, private_key: Ed25519PrivateKey, issuer: str) -> None:
         self._key = private_key
         self._issuer = issuer
+
+    @property
+    def issuer(self) -> str:
+        return self._issuer
+
+    @property
+    def private_key(self) -> Ed25519PrivateKey:
+        return self._key
 
     def publish(self, bundle: PolicyBundle, now: datetime, nonce: bytes = DEFAULT_NONCE) -> bytes:
         envelope = sign(
@@ -77,4 +91,34 @@ def load_bundle_json(path: str | Path, *, now: datetime | None = None) -> Policy
             for c in data["traffic_classes"]
         ),
         rules=tuple(decode_rule(rule) for rule in data["rules"]),
+    )
+
+
+def sign_floor(
+    signer: BundleSigner,
+    *,
+    site_id: str,
+    links: tuple[Link, ...],
+    classes: tuple[TrafficClass, ...],
+    now: datetime,
+    nonce: bytes = DEFAULT_NONCE,
+) -> bytes:
+    """Sign the degraded-mode policy for one site.
+
+    The floor is the mode a site runs in exactly when nobody can reach it, which
+    makes it the last thing that should be whatever the local process happened to
+    construct at start-up.
+    """
+
+    floor = floor_bundle(links, now=now, authority_id=signer.issuer, traffic_classes=classes)
+    payload = encode_floor_config(site_id, link_inventory_hash(links), floor)
+    return encode_envelope(
+        sign(
+            msg_type=MSG_FLOOR_CONFIG,
+            issuer=signer.issuer,
+            issued_at=now,
+            nonce=nonce,
+            payload=payload,
+            private_key=signer.private_key,
+        )
     )

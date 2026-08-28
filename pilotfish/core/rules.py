@@ -37,7 +37,10 @@ class Exclusion:
 class Rule(Protocol):
     """Returns a reason when the link is excluded, or ``None`` when it does not apply."""
 
-    rule_id: str
+    @property
+    def rule_id(self) -> str:
+        """Read-only: rules are frozen, and an identifier that could be reassigned
+        would let an exclusion reason point at a rule that no longer exists."""
 
     def evaluate(
         self,

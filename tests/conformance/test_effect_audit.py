@@ -73,7 +73,11 @@ class BrokenDataplane:
 
 def build(adapter):
     store = BundleStore(
-        trusted_key=AUTHORITY_SK.public_key(), expected_issuer="authority-1", floor_links=LINKS
+        trusted_key=AUTHORITY_SK.public_key(),
+        expected_issuer="authority-1",
+        site_id="site-1",
+        signed_floor=_signed_floor(AUTHORITY_SK, LINKS, site_id="site-1"),
+        now=T0,
     )
     store.accept(
         encode_envelope(
@@ -138,3 +142,18 @@ def test_the_effect_receipt_carries_the_same_decision_it_reports_on():
     decision = cycle.run_once(now=T0)
     receipts = read_chain(sink, SITE_SK.public_key())
     assert {r.decision.bundle_hash for r in receipts} == {decision.bundle_hash}
+
+
+def _signed_floor(key, links, *, site_id, issuer="authority-1", now=None):
+    """A floor configuration signed by the authority, as a real deployment would ship."""
+
+    from pilotfish.authority.signer import BundleSigner, sign_floor
+    from pilotfish.core.models import TrafficClass as _TC
+
+    return sign_floor(
+        BundleSigner(key, issuer),
+        site_id=site_id,
+        links=links,
+        classes=(_TC("default", allow_metered=False),),
+        now=now or T0,
+    )

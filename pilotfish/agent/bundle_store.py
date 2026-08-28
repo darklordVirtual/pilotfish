@@ -22,10 +22,15 @@ from datetime import datetime
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from pilotfish.core.bundle import PolicyBundle, floor_bundle
+from pilotfish.core.bundle import PolicyBundle, link_inventory_hash
 from pilotfish.core.models import MAX_CLOCK_SKEW_S, Link
 from pilotfish.protocol.envelope import SignatureInvalid, decode_envelope, verify
-from pilotfish.protocol.messages import MSG_POLICY_BUNDLE, decode_bundle
+from pilotfish.protocol.messages import (
+    MSG_FLOOR_CONFIG,
+    MSG_POLICY_BUNDLE,
+    decode_bundle,
+    decode_floor_config,
+)
 from pilotfish.sdk.errors import BundleExpired, BundleUnverified
 
 
@@ -35,14 +40,50 @@ class BundleStore:
         *,
         trusted_key: Ed25519PublicKey,
         expected_issuer: str,
-        floor_links: tuple[Link, ...],
+        site_id: str,
+        signed_floor: bytes,
+        now: datetime,
+        floor_links: tuple[Link, ...] | None = None,
     ) -> None:
         self._trusted_key = trusted_key
         self._expected_issuer = expected_issuer
-        self._floor = floor_bundle(floor_links)
+        self._site_id = site_id
+        self._floor = self._install_floor(signed_floor, now, floor_links)
         self._bundle: PolicyBundle | None = None
         self._sequence = -1
         self._seen_nonces: set[bytes] = set()
+
+    def _install_floor(
+        self, signed_floor: bytes, now: datetime, floor_links: tuple[Link, ...] | None
+    ) -> PolicyBundle:
+        """Verify the degraded-mode policy before anything can run under it."""
+
+        try:
+            envelope = decode_envelope(signed_floor)
+        except Exception as exc:
+            raise BundleUnverified(f"floor configuration does not decode: {exc}") from exc
+
+        if envelope.msg_type != MSG_FLOOR_CONFIG:
+            raise BundleUnverified(f"expected {MSG_FLOOR_CONFIG}, got {envelope.msg_type}")
+        if envelope.issuer != self._expected_issuer:
+            raise BundleUnverified(
+                f"floor issued by {envelope.issuer!r}, expected {self._expected_issuer!r}"
+            )
+        try:
+            verify(envelope, self._trusted_key)
+        except SignatureInvalid as exc:
+            raise BundleUnverified(f"floor configuration did not verify: {exc}") from exc
+
+        site_id, inventory_hash, floor = decode_floor_config(envelope.payload)
+        if site_id != self._site_id:
+            raise BundleUnverified(f"floor was issued for site {site_id!r}, not {self._site_id!r}")
+
+        actual_links = floor_links if floor_links is not None else floor.links
+        if link_inventory_hash(tuple(actual_links)) != inventory_hash:
+            raise BundleUnverified(
+                "floor is bound to a different link inventory than this site presents"
+            )
+        return floor
 
     @property
     def sequence(self) -> int:

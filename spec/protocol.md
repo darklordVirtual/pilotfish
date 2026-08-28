@@ -12,6 +12,9 @@ of this protocol follows from that:
 
 - Messages are one-directional and self-standing. There is no request/response
   pair anywhere in the protocol.
+- Evidence and envelopes dated further into the future than a fixed skew
+  allowance are refused. A clock running fast must not be able to make stale
+  things look fresh.
 - Authenticity is a property of the message, not of the channel. An envelope
   verifies alone, having arrived by any route, including one nobody designed.
 - Nothing required for correct operation depends on reaching the authority.
@@ -19,7 +22,11 @@ of this protocol follows from that:
 ## 2. Encoding
 
 CBOR, canonical form: map keys sorted, integers in shortest form, no indefinite
-length items. Timestamps on the wire are integer seconds since the Unix epoch,
+length items.
+
+A bundle hash is the SHA-256 of the bundle's canonical encoding. It must not be
+computed from any runtime's object representation: a hash only one implementation
+can reproduce is not part of a protocol. Timestamps on the wire are integer seconds since the Unix epoch,
 UTC. Implementations must reject a message that does not decode to the exact
 structure specified.
 
@@ -51,12 +58,24 @@ implementation can ignore. There is no unauthenticated mode and no bypass.
 
 ## 4. Messages
 
+Five message types.
+
 ### 4.1 `POLICY_BUNDLE` (authority to site)
 
-The signed rule set with its validity window. Idempotent: receiving the same
-bundle twice has no effect beyond the first. A site accepts it only if the
-signature verifies under a trusted authority key and the current time is inside
-the validity window.
+The signed rule set, carrying `authority_id`, a monotone `sequence` and its
+validity window.
+
+A site accepts it only if all of the following hold: the envelope issuer is the
+authority this site answers to; the envelope is not stamped further into the
+future than the skew allowance; the signature verifies under a trusted key; the
+envelope nonce has not been seen before; the bundle names the same authority; the
+sequence is strictly greater than any previously accepted; and the current time
+is inside the validity window.
+
+The sequence check is the one that is easy to leave out and expensive to omit.
+Authenticity is not freshness. Without it, an old but validly signed bundle can
+replace a newer and stricter one, widening the permitted set without anything
+being forged, and every signature in the resulting audit trail still verifies.
 
 A site that has no valid bundle does not fall back to the last one it liked. It
 falls to its floor policy and marks every decision taken that way as degraded.
@@ -69,11 +88,38 @@ a gap in the record is not an error.
 
 ### 4.3 `DECISION_RECEIPT` (site to authority)
 
-One decision, hash-chained to the previous receipt from the same site, with a
-contiguous sequence number. A verifier that holds a run of receipts can confirm
-that none were removed or reordered. Gaps are visible rather than silent.
+One step in the life of a decision, hash-chained to the previous receipt from the
+same site, with a contiguous sequence number. A verifier holding a run of
+receipts can confirm that none were removed or reordered.
 
-### 4.4 `AUTHORITY_DIRECTIVE` (authority to site)
+Each receipt carries a `kind`:
+
+- `DECISION`: what was authorised.
+- `EXECUTION`: what was attempted against the dataplane.
+- `EFFECT`: what the dataplane was observed to hold afterwards, with an
+  `outcome` of `ENFORCED`, `POSTCONDITION_FAILED` or `ENFORCEMENT_ERROR`, and a
+  hash of the observed state.
+
+Recording only the first is a distinct failure mode rather than a smaller
+version of the same one: a site can report that a link was forbidden while that
+link carried traffic all night, and its log verifies perfectly.
+
+An agent resuming after a restart must recover its chain head from the existing
+log. A chain that restarts at sequence 1 makes a restart indistinguishable from
+somebody having deleted the middle of the log.
+
+### 4.4 `FLOOR_CONFIG` (authority to site, at provisioning)
+
+The degraded-mode policy, bound to one `site_id` and to a hash of that site's
+link inventory. It is signed like everything else, because the floor is the mode
+a site runs in exactly when nobody can reach it, which makes it the last thing
+that should be whatever the local process happened to construct at start-up.
+
+The floor may be more restrictive than ordinary policy. It must never be less:
+it carries every constraint each traffic class declares, and adds its own refusal
+of metered paths and free-space optics.
+
+### 4.5 `AUTHORITY_DIRECTIVE` (authority to site)
 
 A time-bounded override taking one link out, for a human who needs it gone now.
 It is not policy and is deliberately carried separately, so that an exceptional

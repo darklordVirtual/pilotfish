@@ -20,6 +20,7 @@ from pilotfish.adapters.noop import NoopDataplane
 from pilotfish.agent.bundle_store import BundleStore
 from pilotfish.agent.cycle import AgentCycle
 from pilotfish.agent.receipts import ReceiptChain
+from pilotfish.authority.signer import BundleSigner, sign_floor
 from pilotfish.core.bundle import PolicyBundle
 from pilotfish.core.models import EvidenceSnapshot, Link, TrafficClass
 from pilotfish.protocol.envelope import encode_envelope, sign
@@ -159,7 +160,15 @@ class Governed:
         self._store = BundleStore(
             trusted_key=AUTHORITY_KEY.public_key(),
             expected_issuer="authority-1",
-            floor_links=self._bundle.links,
+            site_id=self._site_id,
+            signed_floor=sign_floor(
+                BundleSigner(AUTHORITY_KEY, "authority-1"),
+                site_id=self._site_id,
+                links=self._bundle.links,
+                classes=self._bundle.traffic_classes,
+                now=self._bundle.issued_at,
+            ),
+            now=self._bundle.issued_at,
         )
         self._sink = MemoryReceiptSink()
         self._chain = ReceiptChain(self._site_id, self._sink, SITE_KEY)

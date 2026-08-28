@@ -8,6 +8,7 @@ would do it quietly, which is the worst way for a governance system to fail.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -34,12 +35,14 @@ MSG_POLICY_BUNDLE = "POLICY_BUNDLE"
 MSG_OBSERVATION_BATCH = "OBSERVATION_BATCH"
 MSG_DECISION_RECEIPT = "DECISION_RECEIPT"
 MSG_AUTHORITY_DIRECTIVE = "AUTHORITY_DIRECTIVE"
+MSG_FLOOR_CONFIG = "FLOOR_CONFIG"
 
 MSG_TYPES = (
     MSG_POLICY_BUNDLE,
     MSG_OBSERVATION_BATCH,
     MSG_DECISION_RECEIPT,
     MSG_AUTHORITY_DIRECTIVE,
+    MSG_FLOOR_CONFIG,
 )
 
 
@@ -82,7 +85,7 @@ def encode_rule(rule: Rule) -> list[Any]:
             raise UnknownRuleKind(f"cannot encode rule of type {type(rule).__name__}")
 
 
-_RULE_DECODERS = {
+_RULE_DECODERS: dict[str, Callable[[list[Any]], Rule]] = {
     "down": lambda f: LinkDownRule(f[0]),
     "max_rtt": lambda f: MaxRttRule(f[0], f[1]),
     "metered": lambda f: MeteredRule(f[0], f[1]),
@@ -296,3 +299,22 @@ def decode_directive(payload: bytes) -> AuthorityDirective:
     return AuthorityDirective(
         directive_id=f[0], site_id=f[1], link_id=f[2], reason=f[3], not_after=_dt(f[4])
     )
+
+
+# --- FLOOR_CONFIG -----------------------------------------------------------
+
+
+def encode_floor_config(site_id: str, inventory_hash: str, floor: PolicyBundle) -> bytes:
+    """The degraded-mode policy, bound to one site and one link inventory.
+
+    Both bindings matter. Without the site id a floor could be lifted from one
+    location and replayed at another; without the inventory hash it would keep
+    governing a topology that has since gained links nobody reviewed it against.
+    """
+
+    return dumps([site_id, inventory_hash, encode_bundle(floor)])
+
+
+def decode_floor_config(payload: bytes) -> tuple[str, str, PolicyBundle]:
+    f = loads(payload)
+    return f[0], f[1], decode_bundle(f[2])

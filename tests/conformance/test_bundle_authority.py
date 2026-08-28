@@ -52,7 +52,13 @@ def envelope(b: PolicyBundle, *, issuer: str = AUTHORITY, nonce: bytes | None = 
 
 
 def store() -> BundleStore:
-    return BundleStore(trusted_key=SK.public_key(), expected_issuer=AUTHORITY, floor_links=LINKS)
+    return BundleStore(
+        trusted_key=SK.public_key(),
+        expected_issuer=AUTHORITY,
+        site_id="site-1",
+        signed_floor=_signed_floor(SK, LINKS, site_id="site-1", issuer=AUTHORITY),
+        now=T0,
+    )
 
 
 def test_an_older_but_still_valid_bundle_cannot_replace_a_newer_one():
@@ -123,3 +129,18 @@ def test_bundle_hash_is_the_hash_of_the_wire_encoding():
 
     b = bundle(1, allow_metered=True)
     assert b.hash() == hashlib.sha256(encode_bundle(b)).hexdigest()
+
+
+def _signed_floor(key, links, *, site_id, issuer="authority-1", now=None):
+    """A floor configuration signed by the authority, as a real deployment would ship."""
+
+    from pilotfish.authority.signer import BundleSigner, sign_floor
+    from pilotfish.core.models import TrafficClass as _TC
+
+    return sign_floor(
+        BundleSigner(key, issuer),
+        site_id=site_id,
+        links=links,
+        classes=(_TC("default", allow_metered=False),),
+        now=now or T0,
+    )

@@ -46,7 +46,13 @@ def envelope_bytes(bundle=BUNDLE, key=SK, msg_type=MSG_POLICY_BUNDLE):
 
 
 def store():
-    return BundleStore(trusted_key=PK, expected_issuer="authority-1", floor_links=LINKS)
+    return BundleStore(
+        trusted_key=PK,
+        expected_issuer="authority-1",
+        site_id="site-1",
+        signed_floor=_signed_floor(SK, LINKS, site_id="site-1"),
+        now=T0,
+    )
 
 
 def test_a_good_bundle_is_installed_and_is_not_degraded():
@@ -92,3 +98,18 @@ def test_no_bundle_at_all_is_degraded_from_the_start():
     bundle, degraded = store().current(now=T0)
     assert degraded is True
     assert bundle.bundle_id == "floor"
+
+
+def _signed_floor(key, links, *, site_id, issuer="authority-1", now=None):
+    """A floor configuration signed by the authority, as a real deployment would ship."""
+
+    from pilotfish.authority.signer import BundleSigner, sign_floor
+    from pilotfish.core.models import TrafficClass as _TC
+
+    return sign_floor(
+        BundleSigner(key, issuer),
+        site_id=site_id,
+        links=links,
+        classes=(_TC("default", allow_metered=False),),
+        now=now or T0,
+    )

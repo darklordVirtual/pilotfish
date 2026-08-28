@@ -32,7 +32,11 @@ BUNDLE = PolicyBundle(
 def test_published_bundle_verifies_and_round_trips():
     blob = BundleSigner(SK, "authority-1").publish(BUNDLE, now=T0)
     store = BundleStore(
-        trusted_key=SK.public_key(), expected_issuer="authority-1", floor_links=LINKS
+        trusted_key=SK.public_key(),
+        expected_issuer="authority-1",
+        site_id="site-1",
+        signed_floor=_signed_floor(SK, LINKS, site_id="site-1"),
+        now=T0,
     )
     assert store.accept(blob, now=T0).hash() == BUNDLE.hash()
 
@@ -104,3 +108,18 @@ def test_cli_verify_refuses_a_bundle_signed_by_someone_else(tmp_path):
     main(["keygen", "--out", str(other)])
     main(["sign-bundle", str(POLICY), "--key", str(key), "--out", str(out)])
     assert main(["verify-bundle", str(out), "--key", str(other) + ".pub"]) == 1
+
+
+def _signed_floor(key, links, *, site_id, issuer="authority-1", now=None):
+    """A floor configuration signed by the authority, as a real deployment would ship."""
+
+    from pilotfish.authority.signer import BundleSigner, sign_floor
+    from pilotfish.core.models import TrafficClass as _TC
+
+    return sign_floor(
+        BundleSigner(key, issuer),
+        site_id=site_id,
+        links=links,
+        classes=(_TC("default", allow_metered=False),),
+        now=now or T0,
+    )

@@ -55,7 +55,13 @@ BGP and is not an SD-WAN product.
 
 ## Status
 
-Early. The design specification is in
+Early, and honest about it. The decision core, the protocol, the agent and the
+simulator are implemented and tested. The dataplane adapters that would make this
+useful on a real router, `ip rule` and mwan3, are not written: they need a Linux
+host to test honestly, and an untested adapter in that layer defeats the
+postcondition check that is the point of having one.
+
+The design specification is in
 `docs/superpowers/specs/2026-08-28-pilotfish-design.md` and the implementation
 plan beside it. Whether governed eligibility actually beats greedy selection is
 an open question the simulator in `sim/` exists to answer, and

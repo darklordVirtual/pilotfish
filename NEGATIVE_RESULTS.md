@@ -10,7 +10,7 @@ regulated scenarios, and to lose to greedy metric selection on plain uptime
 during ordinary failover. Section 7.3 of the design specification commits us to
 publishing that loss.
 
-## Comparison run, 2026-08-28
+## Comparison run, 2026-08-28, after the review hardening
 
 Five scenarios, four selectors, five seeds each, 3600 simulated seconds per run
 at a 30 second step. Reproduce with:
@@ -69,7 +69,7 @@ declined to carry traffic it could physically have carried.
 | greedy | 0 | 0 | 0 | 0 | 0.00 | 0 |
 | static_priority | 400 | 0 | 0 | 30 | 0.00 | 0 |
 | hysteresis | 0 | 0 | 0 | 0 | 0.00 | 0 |
-| governed | 0 | 0 | 13950 | 45 | 0.00 | 7650 |
+| governed | 0 | 0 | 9300 | 45 | 0.00 | 7650 |
 
 ## What this says
 
@@ -99,12 +99,27 @@ pretend to be. A deployment that cares about flapping still needs a damped
 scheduler inside the permitted set; the two-layer design allows that, but this
 implementation does not provide it.
 
-Authority blackout: the site spent 7650 class-seconds degraded and refused 13950,
+Authority blackout: the site spent 7650 class-seconds degraded and refused 9300,
 having fallen to the floor policy when its bundle aged out. It violated nothing,
 which is what fail-closed is supposed to buy. Greedy sailed through the same
 scenario with no unserved seconds at all and also violated nothing, because this
 particular scenario contains no constraint for it to breach. That is a fair loss
 and it is recorded as one.
+
+## Change from the first run
+
+The first published run reported 13950 refused class-seconds in the authority
+blackout scenario. It is 9300 here. The floor policy at the time carried a single
+generic traffic class, and the simulator mapped the site's real classes on to it,
+which refused more traffic than the floor actually required. The floor is now
+signed per site and carries the site's own classes, so the number fell.
+
+Making that change also exposed a defect worth recording: the earlier floor
+dropped the jurisdiction and encryption requirements of the classes it governed.
+A site running degraded would have kept its metered-path refusal while quietly
+losing its regulatory constraints, which is fail-open wearing the name of
+fail-closed. The floor now carries every constraint a class declares, and a
+conformance test holds it there.
 
 ## What is not measured
 
@@ -112,3 +127,7 @@ The simulator does not model per-flow behaviour, TCP dynamics, partial
 degradation under load, or the operational cost of running an authority. The
 violation counts are class-steps, not bytes or users affected, so they measure
 frequency rather than harm.
+
+There is no cost model yet, so "zero violations" and "21000 refused seconds"
+cannot be weighed against each other. Until there is one, the table reports both
+and takes no view on which deployment should prefer which.

@@ -141,20 +141,24 @@ system is built for.
 
 ## 6. SDK
 
-One small, stable `pilotfish.sdk`: contract over internal code, typed errors, a
-public API snapshot checked in CI. Four integration points, each a protocol to
+One small, stable `pilotfish.sdk`: contract over internal code, typed errors, and
+a public API snapshot pinned by a test that CI runs. Four integration points, each a protocol to
 implement rather than a class to subclass.
 
 **`ObservationSource`.** Supplies measurements, each with timestamp and source.
-Shipped sources: active probing, `/proc` counters, a modem AT source for LTE signal
-and quota, a weather source for FSO.
+Planned sources, none of them written yet: active probing, `/proc` counters, a
+modem AT source for LTE signal and quota, a weather source for FSO.
 
 **`DataplaneAdapter`.** Takes a permitted set and makes it real. One method in, and
 one method to read back what is actually configured now. The second is not
 decoration: without it there is no postcondition, and the postcondition is the part
 of the REMORA inheritance that matters most here. A decision that was taken but
 never reached the dataplane is among the most common and least visible failures in
-this domain. Shipped adapters: `ip rule`, mwan3, no-op.
+this domain. Shipped adapter: no-op, which records what it was told and reports
+it back. `ip rule` and mwan3 adapters are planned and not written: both need a
+Linux host to test honestly, and an untested adapter in this layer is worse than
+no adapter, because a silent failure here is exactly what the postcondition
+exists to catch.
 
 **`ReceiptSink`.** Where receipts go. A local append-only file is the default and is
 sufficient; uplink delivery is a separate resumable job reading the same file. No
@@ -231,7 +235,7 @@ pilotfish/
   sdk/         the four protocols and typed errors
   agent/       the site agent binding it together
   authority/   bundle signing and publication
-  adapters/    iprule, mwan3, observation sources
+  adapters/    receipt sinks, no-op dataplane (iprule and mwan3 are planned)
 sim/           scenarios, failure models, baselines
 spec/          protocol specification and test vectors
 docs/
@@ -243,6 +247,31 @@ anything being torn out. Moving the agent and protocol core to Rust is triggered
 the rig showing the decision model holds, not before.
 
 Licence follows the REMORA pattern: BUSL-1.1, source-available.
+
+## 9a. Revisions after the first external review, 2026-08-28
+
+An external review found that several claims in sections 3 to 6 were true of the
+design and not yet of the code. The implementation was corrected rather than the
+claims softened, except where noted above as planned work.
+
+- Non-finite measurements are refused at construction. NaN compares false against
+  every threshold, so a NaN reading previously satisfied every rule at once.
+- Evidence dated further ahead than a fixed skew allowance is discarded before
+  any rule reads it, and age never goes negative. A clock running fast could
+  otherwise switch abstention off.
+- A bundle is bound to its authority and to a monotone sequence, and an envelope
+  cannot be replayed. Authenticity is not freshness: a correctly signed older
+  policy could previously replace a newer, stricter one.
+- The receipt chain recovers its head from the existing log, and refuses a log
+  from another site, signed by another key, or with a hole in it.
+- Each cycle writes three receipts: what was authorised, what was attempted, and
+  what the dataplane was observed to hold, with a hash of that observed state.
+- The floor policy is signed by the authority and bound to the site and its link
+  inventory, and it keeps every constraint each traffic class declares. Making it
+  a real per-class configuration exposed that the earlier floor silently dropped
+  jurisdiction and encryption requirements in degraded mode.
+- The bundle hash is the hash of the wire encoding. It previously included
+  Python's `repr()`, which no second implementation could reproduce.
 
 ## 10. Decisions taken during design
 

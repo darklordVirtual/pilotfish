@@ -27,7 +27,7 @@ import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
@@ -55,6 +55,15 @@ KIND_EFFECT = "EFFECT"
 OUTCOME_ENFORCED = "ENFORCED"
 OUTCOME_POSTCONDITION_FAILED = "POSTCONDITION_FAILED"
 OUTCOME_ENFORCEMENT_ERROR = "ENFORCEMENT_ERROR"
+
+
+@runtime_checkable
+class ReadableSink(Protocol):
+    """A receipt sink that can also be read back, which recovery requires."""
+
+    def append(self, receipt_bytes: bytes) -> None: ...
+
+    def read_all(self) -> list[bytes]: ...
 
 
 class ChainBroken(Exception):
@@ -108,7 +117,7 @@ def _receipt_from_body(fields: list[Any]) -> Receipt:
     )
 
 
-def read_chain(sink, public_key: Ed25519PublicKey) -> list[Receipt]:
+def read_chain(sink: ReadableSink, public_key: Ed25519PublicKey) -> list[Receipt]:
     """Decode and verify every receipt in a log.
 
     A receipt that does not verify raises. Reading past it and keeping the rest
@@ -132,7 +141,7 @@ class ReceiptChain:
     def __init__(
         self,
         site_id: str,
-        sink,
+        sink: ReadableSink,
         private_key: Ed25519PrivateKey,
         *,
         seq: int = 0,
@@ -145,7 +154,9 @@ class ReceiptChain:
         self._prev_hash = prev_hash
 
     @classmethod
-    def recover(cls, sink, private_key: Ed25519PrivateKey, *, site_id: str) -> ReceiptChain:
+    def recover(
+        cls, sink: ReadableSink, private_key: Ed25519PrivateKey, *, site_id: str
+    ) -> ReceiptChain:
         """Resume an existing log, or start a new one if there is nothing there.
 
         Constructing a chain without this is how an audit trail silently restarts

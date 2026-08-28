@@ -84,7 +84,9 @@ def build(adapter=None, install=BUNDLE):
     store = BundleStore(
         trusted_key=AUTHORITY_SK.public_key(),
         expected_issuer="authority-1",
-        floor_links=LINKS,
+        site_id="site-1",
+        signed_floor=_signed_floor(AUTHORITY_SK, LINKS, site_id="site-1"),
+        now=T0,
     )
     if install is not None:
         store.accept(envelope_for(install), now=T0)
@@ -131,7 +133,9 @@ def test_bundle_swap_mid_cycle_does_not_mix_two_bundles():
     store = BundleStore(
         trusted_key=AUTHORITY_SK.public_key(),
         expected_issuer="authority-1",
-        floor_links=LINKS,
+        site_id="site-1",
+        signed_floor=_signed_floor(AUTHORITY_SK, LINKS, site_id="site-1"),
+        now=T0,
     )
     store.accept(envelope_for(BUNDLE), now=T0)
 
@@ -157,3 +161,18 @@ def test_bundle_swap_mid_cycle_does_not_mix_two_bundles():
     second = cycle.run_once(now=T0 + timedelta(seconds=60))
     assert second.bundle_hash == OTHER_BUNDLE.hash()
     assert second.permitted_for("bulk") == ("fiber0",)
+
+
+def _signed_floor(key, links, *, site_id, issuer="authority-1", now=None):
+    """A floor configuration signed by the authority, as a real deployment would ship."""
+
+    from pilotfish.authority.signer import BundleSigner, sign_floor
+    from pilotfish.core.models import TrafficClass as _TC
+
+    return sign_floor(
+        BundleSigner(key, issuer),
+        site_id=site_id,
+        links=links,
+        classes=(_TC("default", allow_metered=False),),
+        now=now or T0,
+    )
