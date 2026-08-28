@@ -94,12 +94,13 @@ def build(adapter=None, install=BUNDLE):
     return store, sink, cycle
 
 
-def test_a_normal_cycle_permits_both_links_and_writes_one_receipt():
+def test_a_normal_cycle_permits_both_links_and_logs_the_full_lifecycle():
     _, sink, cycle = build()
     decision = cycle.run_once(now=T0)
     assert decision.permitted_for("bulk") == ("fiber0", "lte0")
     assert decision.degraded is False
-    assert len(sink.lines) == 1
+    # Authorised, attempted, verified.
+    assert len(sink.lines) == 3
 
 
 def test_without_a_bundle_the_cycle_runs_degraded_on_the_floor_policy():
@@ -107,14 +108,15 @@ def test_without_a_bundle_the_cycle_runs_degraded_on_the_floor_policy():
     decision = cycle.run_once(now=T0)
     assert decision.degraded is True
     assert decision.permitted_for("default") == ("fiber0",)
-    assert len(sink.lines) == 1
+    assert len(sink.lines) == 3
 
 
-def test_readback_mismatch_raises_after_the_receipt_is_written():
+def test_readback_mismatch_raises_after_the_receipts_are_written():
     _, sink, cycle = build(adapter=LyingDataplane())
     with pytest.raises(PostconditionViolation):
         cycle.run_once(now=T0)
-    assert len(sink.lines) == 1
+    # The decision, the attempt and the failed effect all survive the exception.
+    assert len(sink.lines) == 3
 
 
 def test_a_dataplane_that_silently_did_nothing_is_caught():

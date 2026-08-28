@@ -46,3 +46,6 @@ class MemoryReceiptSink:
 
     def append(self, receipt_bytes: bytes) -> None:
         self.lines.append(receipt_bytes)
+
+    def read_all(self) -> list[bytes]:
+        return list(self.lines)

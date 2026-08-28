@@ -70,11 +70,12 @@ def test_governed_keeps_bulk_off_metered_links_even_when_they_are_fastest():
     assert choices["realtime"] == "lte0"
 
 
-def test_governed_writes_one_receipt_per_decision():
+def test_governed_writes_a_full_receipt_lifecycle_per_decision():
     selector = Governed(bundle(), site_id="sim-site")
     selector(context())
     selector(context(now=T0 + timedelta(seconds=30)))
-    assert len(selector.receipts) == 2
+    # Three receipts per cycle: authorised, attempted, verified.
+    assert len(selector.receipts) == 6
 
 
 def test_governed_without_an_authority_falls_to_the_floor_policy():
