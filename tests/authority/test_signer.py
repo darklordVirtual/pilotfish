@@ -18,6 +18,8 @@ POLICY = Path(__file__).parents[2] / "examples/policy.json"
 
 BUNDLE = PolicyBundle(
     bundle_id="b1",
+    authority_id="authority-1",
+    sequence=1,
     issued_at=T0,
     not_after=T0 + timedelta(hours=6),
     decision_ttl_s=60,
@@ -29,7 +31,9 @@ BUNDLE = PolicyBundle(
 
 def test_published_bundle_verifies_and_round_trips():
     blob = BundleSigner(SK, "authority-1").publish(BUNDLE, now=T0)
-    store = BundleStore(trusted_key=SK.public_key(), floor_links=LINKS)
+    store = BundleStore(
+        trusted_key=SK.public_key(), expected_issuer="authority-1", floor_links=LINKS
+    )
     assert store.accept(blob, now=T0).hash() == BUNDLE.hash()
 
 

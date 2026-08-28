@@ -59,6 +59,8 @@ RULES = (
 def bundle(validity_s: int = 1800, decision_ttl_s: int = 120) -> PolicyBundle:
     return PolicyBundle(
         bundle_id="sim-policy",
+        authority_id="authority-1",
+        sequence=1,
         issued_at=T0,
         not_after=T0 + timedelta(seconds=validity_s),
         decision_ttl_s=decision_ttl_s,

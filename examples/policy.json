@@ -1,5 +1,7 @@
 {
   "bundle_id": "site-north-v3",
+  "authority_id": "authority-1",
+  "sequence": 3,
   "validity_s": 86400,
   "decision_ttl_s": 120,
   "links": [

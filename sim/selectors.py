@@ -130,17 +130,26 @@ class Governed:
         self.reset()
 
     def _publish(self, now: datetime) -> bytes:
-        """The authority reissues on a cadence; a site out of contact ages out of its bundle."""
+        """The authority reissues on a cadence; a site out of contact ages out of its bundle.
 
+        Each publication carries a higher sequence and a fresh nonce, because a
+        store that refuses rollback and replay would otherwise refuse the
+        authority's own routine refresh.
+        """
+
+        self._epoch += 1
         fresh = replace(
-            self._bundle, issued_at=now, not_after=now + timedelta(seconds=self._validity_s)
+            self._bundle,
+            sequence=self._epoch,
+            issued_at=now,
+            not_after=now + timedelta(seconds=self._validity_s),
         )
         return encode_envelope(
             sign(
                 msg_type=MSG_POLICY_BUNDLE,
                 issuer="authority-1",
                 issued_at=now,
-                nonce=b"\x07" * 16,
+                nonce=self._epoch.to_bytes(16, "big"),
                 payload=encode_bundle(fresh),
                 private_key=AUTHORITY_KEY,
             )
@@ -148,11 +157,14 @@ class Governed:
 
     def reset(self) -> None:
         self._store = BundleStore(
-            trusted_key=AUTHORITY_KEY.public_key(), floor_links=self._bundle.links
+            trusted_key=AUTHORITY_KEY.public_key(),
+            expected_issuer="authority-1",
+            floor_links=self._bundle.links,
         )
         self._sink = MemoryReceiptSink()
         self._chain = ReceiptChain(self._site_id, self._sink, SITE_KEY)
         self._adapter = NoopDataplane()
+        self._epoch = 0
         self.last_degraded = True
 
     @property

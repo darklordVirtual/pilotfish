@@ -45,6 +45,8 @@ CLASSES = (
 
 BUNDLE = PolicyBundle(
     bundle_id="b1",
+    authority_id="authority-1",
+    sequence=1,
     issued_at=T0,
     not_after=T0 + timedelta(hours=24),
     decision_ttl_s=120,

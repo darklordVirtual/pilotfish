@@ -17,6 +17,8 @@ LINKS = (Link(id="fiber0", type="fiber"), Link(id="lte0", type="lte", metered=Tr
 
 BUNDLE = PolicyBundle(
     bundle_id="b1",
+    authority_id="authority-1",
+    sequence=1,
     issued_at=T0,
     not_after=T0 + timedelta(hours=6),
     decision_ttl_s=60,

@@ -15,6 +15,8 @@ LINKS = (
 
 BUNDLE = PolicyBundle(
     bundle_id="b1",
+    authority_id="authority-1",
+    sequence=1,
     issued_at=T0,
     not_after=T0 + timedelta(hours=24),
     decision_ttl_s=120,
@@ -81,6 +83,8 @@ def test_a_link_excluded_by_two_rules_reports_both():
     bundle = BUNDLE.with_rules(BUNDLE.rules + (MeteredRule("R-METER", class_id="bulk"),))
     strict = PolicyBundle(
         bundle_id="b2",
+        authority_id="authority-1",
+        sequence=1,
         issued_at=T0,
         not_after=T0 + timedelta(hours=1),
         decision_ttl_s=60,

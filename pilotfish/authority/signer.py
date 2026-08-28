@@ -48,6 +48,8 @@ def load_bundle_json(path: str | Path, *, now: datetime | None = None) -> Policy
     issued = now or datetime.now(tz=UTC)
     return PolicyBundle(
         bundle_id=data["bundle_id"],
+        authority_id=data["authority_id"],
+        sequence=data["sequence"],
         issued_at=issued,
         not_after=issued + timedelta(seconds=data["validity_s"]),
         decision_ttl_s=data["decision_ttl_s"],

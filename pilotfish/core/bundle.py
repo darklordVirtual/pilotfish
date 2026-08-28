@@ -6,8 +6,6 @@ import hashlib
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
-import cbor2
-
 from pilotfish.core.models import Link, TrafficClass
 from pilotfish.core.rules import (
     LinkDownRule,
@@ -21,9 +19,18 @@ FLOOR_BUNDLE_ID = "floor"
 
 @dataclass(frozen=True, slots=True)
 class PolicyBundle:
-    """A signed-in-transit, hashed-at-rest set of rules and the classes they bind to."""
+    """A signed-in-transit, hashed-at-rest set of rules and the classes they bind to.
+
+    ``authority_id`` and ``sequence`` exist because a signature answers only one
+    of the three questions that matter. It says who wrote this. It does not say
+    whether they are the authority this site answers to, and it does not say
+    whether this is the policy currently in force rather than one from last year
+    that happens to still be inside its validity window.
+    """
 
     bundle_id: str
+    authority_id: str
+    sequence: int
     issued_at: datetime
     not_after: datetime
     decision_ttl_s: int
@@ -35,35 +42,16 @@ class PolicyBundle:
         return replace(self, rules=tuple(rules))
 
     def hash(self) -> str:
-        payload = [
-            self.bundle_id,
-            int(self.issued_at.timestamp()),
-            int(self.not_after.timestamp()),
-            self.decision_ttl_s,
-            sorted(
-                [
-                    link.id,
-                    link.type,
-                    link.metered,
-                    link.encrypted_below,
-                    list(link.jurisdictions),
-                    link.owner,
-                ]
-                for link in self.links
-            ),
-            sorted(
-                [
-                    c.id,
-                    c.max_rtt_ms,
-                    c.allow_metered,
-                    None if c.allowed_jurisdictions is None else list(c.allowed_jurisdictions),
-                    c.requires_encryption,
-                ]
-                for c in self.traffic_classes
-            ),
-            sorted([type(r).__name__, r.rule_id, repr(r)] for r in self.rules),
-        ]
-        return hashlib.sha256(cbor2.dumps(payload, canonical=True)).hexdigest()
+        """The hash of the wire encoding, and nothing else.
+
+        This is deliberately not computed from Python objects. A Rust agent has
+        no ``repr()``, and a cryptographic contract that only one runtime can
+        reproduce is not a contract.
+        """
+
+        from pilotfish.protocol.messages import encode_bundle
+
+        return hashlib.sha256(encode_bundle(self)).hexdigest()
 
 
 def floor_bundle(links: tuple[Link, ...], *, now: datetime | None = None) -> PolicyBundle:
@@ -77,6 +65,8 @@ def floor_bundle(links: tuple[Link, ...], *, now: datetime | None = None) -> Pol
     issued = now or datetime.fromtimestamp(0, tz=UTC)
     return PolicyBundle(
         bundle_id=FLOOR_BUNDLE_ID,
+        authority_id=FLOOR_BUNDLE_ID,
+        sequence=0,
         issued_at=issued,
         not_after=issued + timedelta(days=3650),
         decision_ttl_s=60,

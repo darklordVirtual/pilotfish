@@ -21,9 +21,11 @@ SITE_SK = Ed25519PrivateKey.from_private_bytes(bytes(range(96, 128)))
 LINKS = (Link(id="fiber0", type="fiber"), Link(id="lte0", type="lte", metered=True))
 
 
-def bundle(bundle_id="b1", allow_metered=True):
+def bundle(bundle_id="b1", allow_metered=True, sequence=1):
     return PolicyBundle(
         bundle_id=bundle_id,
+        authority_id="authority-1",
+        sequence=sequence,
         issued_at=T0,
         not_after=T0 + timedelta(hours=6),
         decision_ttl_s=60,
@@ -34,7 +36,7 @@ def bundle(bundle_id="b1", allow_metered=True):
 
 
 BUNDLE = bundle()
-OTHER_BUNDLE = bundle("b2", allow_metered=False)
+OTHER_BUNDLE = bundle("b2", allow_metered=False, sequence=2)
 
 
 def envelope_for(b):
@@ -43,7 +45,7 @@ def envelope_for(b):
             msg_type=MSG_POLICY_BUNDLE,
             issuer="authority-1",
             issued_at=T0,
-            nonce=b"\x03" * 16,
+            nonce=bytes([b.sequence]) * 16,
             payload=encode_bundle(b),
             private_key=AUTHORITY_SK,
         )
@@ -79,7 +81,11 @@ class SilentDataplane:
 
 
 def build(adapter=None, install=BUNDLE):
-    store = BundleStore(trusted_key=AUTHORITY_SK.public_key(), floor_links=LINKS)
+    store = BundleStore(
+        trusted_key=AUTHORITY_SK.public_key(),
+        expected_issuer="authority-1",
+        floor_links=LINKS,
+    )
     if install is not None:
         store.accept(envelope_for(install), now=T0)
     sink = MemoryReceiptSink()
@@ -120,12 +126,23 @@ def test_a_dataplane_that_silently_did_nothing_is_caught():
 def test_bundle_swap_mid_cycle_does_not_mix_two_bundles():
     """A bundle arriving while we decide governs the next decision, not half of this one."""
 
-    store = BundleStore(trusted_key=AUTHORITY_SK.public_key(), floor_links=LINKS)
+    store = BundleStore(
+        trusted_key=AUTHORITY_SK.public_key(),
+        expected_issuer="authority-1",
+        floor_links=LINKS,
+    )
     store.accept(envelope_for(BUNDLE), now=T0)
 
     class SwappingSource:
+        """Installs the new bundle exactly once, in the middle of the first cycle."""
+
+        def __init__(self):
+            self.swapped = False
+
         def observe(self, now):
-            store.accept(envelope_for(OTHER_BUNDLE), now=now)
+            if not self.swapped:
+                store.accept(envelope_for(OTHER_BUNDLE), now=now)
+                self.swapped = True
             return AllUp().observe(now)
 
     chain = ReceiptChain("site-1", MemoryReceiptSink(), SITE_SK)

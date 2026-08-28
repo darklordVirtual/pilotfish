@@ -155,6 +155,8 @@ def encode_bundle(bundle: PolicyBundle) -> bytes:
     return dumps(
         [
             bundle.bundle_id,
+            bundle.authority_id,
+            bundle.sequence,
             _ts(bundle.issued_at),
             _ts(bundle.not_after),
             bundle.decision_ttl_s,
@@ -169,12 +171,14 @@ def decode_bundle(payload: bytes) -> PolicyBundle:
     f = loads(payload)
     return PolicyBundle(
         bundle_id=f[0],
-        issued_at=_dt(f[1]),
-        not_after=_dt(f[2]),
-        decision_ttl_s=f[3],
-        links=tuple(_decode_link(x) for x in f[4]),
-        traffic_classes=tuple(_decode_class(x) for x in f[5]),
-        rules=tuple(decode_rule(x) for x in f[6]),
+        authority_id=f[1],
+        sequence=f[2],
+        issued_at=_dt(f[3]),
+        not_after=_dt(f[4]),
+        decision_ttl_s=f[5],
+        links=tuple(_decode_link(x) for x in f[6]),
+        traffic_classes=tuple(_decode_class(x) for x in f[7]),
+        rules=tuple(decode_rule(x) for x in f[8]),
     )
 
 

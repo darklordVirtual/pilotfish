@@ -21,6 +21,8 @@ LINKS = (Link(id="fiber0", type="fiber"), Link(id="lte0", type="lte", metered=Tr
 
 BUNDLE = PolicyBundle(
     bundle_id="b1",
+    authority_id="authority-1",
+    sequence=1,
     issued_at=T0,
     not_after=T0 + timedelta(hours=6),
     decision_ttl_s=60,
@@ -44,7 +46,7 @@ def envelope_bytes(bundle=BUNDLE, key=SK, msg_type=MSG_POLICY_BUNDLE):
 
 
 def store():
-    return BundleStore(trusted_key=PK, floor_links=LINKS)
+    return BundleStore(trusted_key=PK, expected_issuer="authority-1", floor_links=LINKS)
 
 
 def test_a_good_bundle_is_installed_and_is_not_degraded():
